@@ -1,0 +1,120 @@
+//Definindo os pinos dos LEDs de saída
+const int LED_VM = 2;
+const int LED_AM = 3;
+const int LED_VD = 4;
+
+//Definindo o pino de entrada analógica conectado ao sinal amplificado do Termopar K
+const int entrada = A5;
+
+//Definindo as faixas de valores
+//Led Verde acende quando >= 1,6V && <= 2,4
+#define VD_Min 327
+#define VD_Max 491
+
+//Led Amarelo acende quando >= 0V && <1,6 || > 2,4V && <= 4V
+#define AM1_Max 326 //Máximo da primeira faixa amarela (1.6V)
+#define AM2_Min 492 //Mínimo da segunda faixa amarela (2.4)
+#define AM2_Max 818 //Máximo da segunda faixa amarela (4V)
+
+//Definindo valores de histerese max e min
+#define Histerese 10 //Valor de histerese em bits, como varia de 0 a 1023, temos que 5V/1023bit = 4,88mV/bit, então 10bit ≈ 50mV de histerese
+#define VD_HistNeg 317
+#define VD_HistPos 501
+#define AM1_HistPos 336
+#define AM2_HistNeg 482
+#define AM2_HistPos 828
+        
+
+//Variável para armazenar o estado atual
+int Estado_Anterior = 0; //definindo zero para nao receber valor de lixo
+
+void setup() 
+{
+  //Configura os pinos dos LEDs como saída
+  pinMode(LED_VM, OUTPUT);
+  pinMode(LED_AM, OUTPUT);
+  pinMode(LED_VD, OUTPUT);
+
+  //Inicia a comunicação serial para monitoramento no Serial Monitor
+  Serial.begin(9600);
+}
+
+void loop() 
+{
+  //Lê o valor analógico da entrada (0 a 1023 para 0 a 5V)
+  int valor = analogRead(entrada);
+  
+  // Mostra o valor lido no monitor serial
+  float tensao = valor * (5.0 / 1023.0);//Conversão do valor lido pela entrada analógica do Arduino (de 0 a 1023) para uma tensão real em volts (0 a 5V)
+  
+  Serial.print("Bits: ");//Mostra o valor em bits
+  Serial.print(valor);
+  Serial.print(" | Tensão: ");//Mostra o valor convertido em tensão
+  Serial.print(tensao, 2);
+  Serial.println(" V");
+  
+  //Determina o estado atual com histerese
+  int Estado_Atual;
+  
+  if (valor >= (VD_HistNeg) && valor <= (VD_HistPos))//Verificação da faixa verde com zona de histerese estendida
+  {   
+    if (valor >= VD_Min && valor <= VD_Max)//Caso 1: Dentro da faixa verde nominal (sem histerese)
+    {
+      Estado_Atual = 2; //Estado atual da faixa Verde
+    } 
+    else if (Estado_Anterior == 2)//Caso 2: Na zona de histerese superior/inferior com estado anterior verde
+    {
+      Estado_Atual = 2;//Mantém verde (aplica histerese positiva)
+    } 
+    else //Caso 3: Na zona de histerese mas estado anterior não era verde
+    {
+      Estado_Atual = 1; //Transição para amarelo (histerese negativa)
+    }
+  } 
+  //Verificação das faixas amarelas (duas faixas distintas) com histerese
+  else if ((valor >= 0 && valor <= (AM1_HistPos)) || (valor >= (AM2_HistNeg) && valor <= (AM2_HistPos)))
+  {
+    if ((valor >= 0 && valor <= AM1_Max) || (valor >= AM2_Min && valor <= AM2_Max))//Caso 1: Dentro das faixas amarelas nominais
+    {
+      Estado_Atual = 1;//Estado atual da faixa Amarelo
+    } 
+    else if (Estado_Anterior == 1)//Caso 2: Zona de histerese com estado anterior amarelo
+    {
+      Estado_Atual = 1;//Mantém amarelo (aplica histerese positiva)
+    } 
+    else //Caso 3: Zona de histerese sem estado anterior amarelo
+    {
+      Estado_Atual = 0;//Transição para vermelho (histerese negativa)
+    }
+  }
+  else 
+  {
+    Estado_Atual = 0;//Estado atual da faixa Vermelho
+  }
+  
+  //Atualiza os LEDs baseado na maquina de estado
+  switch (Estado_Atual) {
+    case 2: // Verde
+      digitalWrite(LED_VD, HIGH);
+      digitalWrite(LED_AM, LOW);
+      digitalWrite(LED_VM, LOW);
+      break;
+      
+    case 1: // Amarelo
+      digitalWrite(LED_VD, LOW);
+      digitalWrite(LED_AM, HIGH);
+      digitalWrite(LED_VM, LOW);
+      break;
+      
+    case 0: // Vermelho
+    default:
+      digitalWrite(LED_VD, LOW);
+      digitalWrite(LED_AM, LOW);
+      digitalWrite(LED_VM, HIGH);
+      break;
+  }
+  Estado_Anterior = Estado_Atual;
+  
+  //Aguarda 100 milissegundos antes de fazer nova leitura
+  delay(100);
+}
