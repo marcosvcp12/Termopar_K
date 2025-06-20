@@ -11,7 +11,7 @@ const int LED_VM = 8;//Vermelho
 //Definindo o pino de entrada analógica conectado ao sinal amplificado do Termopar K
 const int entrada = A5;
 
-#define Vref 4.89 //Valor de acordo com a tensao no pino do arduino, será usada como referencia
+#define Vref 4.90 //Valor de acordo com a tensao no pino do arduino, será usada como referencia
 
 //Conversão para bits, de acordo com o valor de referência
 //Led Verde acende quando >= 1,6V && <= 2,4
