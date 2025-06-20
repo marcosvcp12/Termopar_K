@@ -19,9 +19,9 @@ const int entrada = A5;
 #define VD_Max ((2.4*1023)/Vref)
 
 //Led Amarelo acende quando >= 0V && <1,6 || > 2,4V && <= 4V
-#define AM1_Max (((1.6*1023)/Vref)+1) //Máximo da primeira faixa amarela (1.6V)
-#define AM2_Min (((2.4*1023)/Vref)-1) //Mínimo da segunda faixa amarela (2.4)
-#define AM2_Max (((4*1023)/Vref)+1)//Máximo da segunda faixa amarela (4V)
+#define AM1_Max (((1.6*1023)/Vref)-1) //Máximo da primeira faixa amarela (1.6V)
+#define AM2_Min (((2.4*1023)/Vref)+1) //Mínimo da segunda faixa amarela (2.4)
+#define AM2_Max (((4*1023)/Vref)-1)//Máximo da segunda faixa amarela (4V)
 
 //Definindo valores de histerese max e min
 #define Histerese 10 //Valor de histerese em bits, como varia de 0 a 1023, temos que 5V/1023bit = 4,88mV/bit, então 10bit ≈ 50mV de histerese
@@ -36,6 +36,7 @@ int Estado_Anterior = 0;//definindo zero para nao receber valor de lixo
 
 void setup() 
 {
+  //Configura os pinos dos LEDs como saída
   pinMode(LED_VM, OUTPUT);
   pinMode(LED_AM, OUTPUT);
   pinMode(LED_VD, OUTPUT);
@@ -43,13 +44,13 @@ void setup()
   // Inicialização do LCD
   lcd.begin(16, 2);
   lcd.setCursor(0, 0);//Primeira linha, primeira coluna
-  lcd.print("Iniciando...");
+  lcd.print("Iniciando...");//Mostra mensagem de inicialização na primeira linha
   lcd.setCursor(0, 1);//Segunda linha, primeira coluna
-  lcd.print("Proj. Termopar K");
-  delay(5000);
-  lcd.clear();
+  lcd.print("Proj. Termopar K");//Nome do projeto na segunda linha
+  delay(5000);//Aguarda 5 segundos para que o usuário leia a mensagem
+  lcd.clear();//Limpa o display para começar a exibir os dados
   
-  Serial.begin(9600);
+  Serial.begin(9600);//Inicializa a comunicação serial a 9600 bps
 }
 
 void loop() 
@@ -58,33 +59,38 @@ void loop()
   int valor = analogRead(entrada);
   float tensao = valor * (Vref / 1023.0);//Conversão do valor lido pela entrada analógica do Arduino (de 0 a 1023) para uma tensão real em volts (0 a 5V)
   
-  // Cálculo da temperatura (0-4V -> 550-1050°C)
+  // Cálculo da temperatura com base na tensão medida
+  //Faixa de tensão: 0V a 4V → Faixa de temperatura: 550°C a 1050°C
   float temperatura;
-  if (tensao <= 0.0) 
+  if (tensao <= 0.0) //Se a tensão for 0V ou menor, assume-se a temperatura mínima (limite inferior)
   {
     temperatura = 550.0;
   } 
-  else if (tensao <= 1.6) 
+  else if (tensao <= 1.6) //Faixa 0V a 1.6V → temperatura de 550°C a 750°C (intervalo de 200°C)
   {
-    temperatura = 550.0 + (tensao / 1.6) * 200.0;
+    temperatura = 550.0 + (tensao / 1.6) * 200.0;//Interpolação linear: (tensao / 1.6) * 200 + 550
   } 
-  else if (tensao <= 2.4) 
+  else if (tensao <= 2.4) //Faixa 1.6V a 2.4V → temperatura de 750°C a 850°C (intervalo de 100°C)
   {
-    temperatura = 750.0 + ((tensao - 1.6) / 0.8) * 100.0;
+    temperatura = 750.0 + ((tensao - 1.6) / 0.8) * 100.0;//Interpolação linear: ((tensao - 1.6) / 0.8) * 100 + 750
   } 
-  else if (tensao <= 4.0) 
+  else if (tensao <= 4.0)//Faixa 2.4V a 4.0V → temperatura de 850°C a 1050°C (intervalo de 200°C)
   {
-    temperatura = 850.0 + ((tensao - 2.4) / 1.6) * 200.0;
+    temperatura = 850.0 + ((tensao - 2.4) / 1.6) * 200.0;//Interpolação linear: ((tensao - 2.4) / 1.6) * 200 + 850
   } 
-  else 
+  else //Se a tensão for maior que 4V, assume-se a temperatura máxima (limite superior)
   {
     temperatura = 1050.0;
   }
   
   // Conversão para 4-20mA (0-4V corresponde a 4-20mA)
   float corrente = 4.0 + (tensao / 4.0) * 16.0;
-  if (corrente < 4.0) corrente = 4.0;
-  if (corrente > 20.0) corrente = 20.0;
+  // A fórmula faz uma interpolação linear:
+  // - 0V → 4mA
+  // - 4V → 20mA
+  // Cada 1V representa 4mA (16mA no total entre 4 e 20mA)
+  if (corrente < 4.0) corrente = 4.0; //Garante que a corrente nunca seja menor que 4mA
+  if (corrente > 20.0) corrente = 20.0; //Garante que a corrente nunca ultrapasse 20mA
 
   // Exibição OTIMIZADA no LCD
   lcd.setCursor(0, 0);//Linha superior
